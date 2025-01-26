@@ -1,11 +1,30 @@
 #include "funcoes.h"
 #include <iostream>
+#include <algorithm>
+#include <limits>
 #include "stdio.h"
+
 using namespace std;
+
+//Matriz de custo nas arestas
+// double cost[MAX_NODES][MAX_NODES] = {
+// /*           0           1          2          3           4         5 
+// /*0*/    { 0 ,           3,         5,      INFINITY,   INFINITY,  INFINITY },
+// /*1*/    { 3 ,           0,      INFINITY,     1,       INFINITY,  INFINITY },
+// /*2*/    { 5 ,       INFINITY,      0,         2,          1,   	  INFINITY },
+// /*3*/    {INFINITY,      1,         2,         0,          4,   		 2  },
+// /*4*/    {INFINITY,  INFINITY,      1,         4,          0,   		 3  },
+// /*5*/    {INFINITY,  INFINITY,   INFINITY,     2,          3,   		 0  } 
+// };
+
+// //Vértices que podem ser tarifados
+// vector<int> tollEdges = {9, 16, 23};
+// (1,3) (2,4) (3,5)
 
 //Armazena o numero de avaliacoes para cada nivel
 int nEvalL = 0;
 int nEvalF = 0;
+
 
 int getNEval(int nivel){
 	if (nivel == 1)
@@ -14,7 +33,7 @@ int getNEval(int nivel){
 		return nEvalF;
 }
 
-int getDimensao(int funcao, int nivel){
+int getDimensao(int funcao, int nivel, int maxNodes, int maxTollEdges){
 	switch(funcao){
 		case 1001: //SMD1 -Deb
 			if (nivel == 1){
@@ -194,6 +213,13 @@ int getDimensao(int funcao, int nivel){
 				return 6;
 			}
 		break;
+		//// Problema de tarifação
+		case 20:
+			if (nivel == 1){
+				return maxTollEdges;
+			} else if (nivel == 2){
+				return maxNodes;
+			}
 	}
 }
 
@@ -378,11 +404,134 @@ int getTipo(int funcao, int nivel){
 				return 1;
 			}
 		break;
+		///Problema de tarifação
+		case 20:
+			if (nivel == 1){
+				return 2;
+			} else if (nivel == 2){
+				return 1;
+			}
 	}
 }
 
+int* copyUntilElement(int* path, int length, int element, int& newLength) {
+    // Determine the length of the new array
+    newLength = 0;
+    for (int i = 0; i < length; i++) {
+        if (path[i] == element) {
+            break;
+        }
+        newLength++;
+    }
 
-void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follower, int funcao){
+    // Allocate memory for the new array
+    int* newArray = new int[newLength];
+
+    // Copy elements to the new array
+    for (int i = 0; i < newLength; i++) {
+        newArray[i] = path[i];
+    }
+
+    return newArray;
+}
+
+void printDOT(ofstream &file, double **&cost, int maxNodes, int *path, vector<int> tollEdges, int endNode){
+	int newLength = 0;
+	int *shortPath = copyUntilElement(path, maxNodes, endNode, newLength);
+	file << "digraph G {" << endl;
+	
+	for(int i = 0; i < maxNodes; i++){
+		for(int j = 0; j < maxNodes; j++){
+			if(cost[i][j] != 0 && cost[i][j] != INFINITY){
+				
+				if(ehTarifado(i, j, tollEdges, maxNodes)){
+					file << i << " -> " << j << " [label=\"" << cost[i][j] << "\", color=\"red\"];" << endl;
+				}else{
+					file << i << " -> " << j << " [label=\"" << cost[i][j] << "\"];" << endl;
+				}
+				
+			}
+		}
+	}
+
+	for(int i = 0; i < newLength - 1; i++){
+		int source = shortPath[i];
+		int target = shortPath[i + 1];
+		if(ehTarifado(source, target, tollEdges, maxNodes)){
+			file << source << " -> " << target << " [label=\"" << cost[source][target] << "\", color=\"red\", style=\"dashed\"];" << endl;
+		} else {
+			file << source << " -> " << target << " [label=\"" << cost[source][target] << "\", color=\"blue\"];" << endl;
+		}
+		
+	}
+
+	file << "}" << endl;
+}
+
+bool ehTarifado(int source, int target, vector<int> tollEdges, int maxNodes){
+	int index = source * maxNodes + target;
+	if(find(tollEdges.begin(), tollEdges.end(), index) != tollEdges.end()){
+		return true;
+	}
+	return false;
+}
+
+
+int *ordenaSolucao(double *solucao, int maxNodes, int startNode){
+
+	int numNodes = maxNodes;
+	int *solucaoIndices = new int[numNodes];
+	double *temp = new double[numNodes];
+	
+	for(int i=0;i<numNodes;i++){
+		temp[i] = solucao[i];
+		solucaoIndices[i] = i;
+	}
+
+	// for(int i=0;i<numNodes;i++){
+	// 	cout << solucao[i] << " ";
+	// }
+	
+	for(int i=0;i<numNodes;i++){
+		for(int j=0;j<numNodes;j++){
+			if(temp[solucaoIndices[i]] < temp[solucaoIndices[j]]){
+				int aux = solucaoIndices[i];
+				solucaoIndices[i] = solucaoIndices[j];
+				solucaoIndices[j] = aux;
+			}
+		}
+	}
+	// cout << endl;
+	// for(int i=0;i<numNodes;i++){
+	// 	cout << solucaoIndices[i] << " ";
+	// }
+	// exit(1);
+
+	int element_to_move;
+	for(int i=0;i<numNodes;i++){
+		if(solucaoIndices[i] == startNode){
+			element_to_move = i;
+			break;
+		}
+	}
+	
+	int aux;
+	for(int i=element_to_move;i>0;i--){
+		//cout << i << endl;
+		aux = solucaoIndices[i];
+		solucaoIndices[i] = solucaoIndices[i-1];
+		solucaoIndices[i-1] = aux;
+	}
+
+	// for(int i=0;i<numNodes;i++){
+	// 	cout << solucaoIndices[i] << " ";
+	// }
+
+	delete [] temp;
+	return solucaoIndices;
+}
+
+void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follower, int funcao, double **cost, vector<int> tollEdges, int maxNodes, int startNode, int endNode){
 
 	//Incrementa o numero de chamadas à função
 	if (nivel == 1)
@@ -1508,9 +1657,122 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
 		ind[d] = fit;
 		ind[d + 1] = rest;
 	}
+	//Problema de tarifação
+	else if(funcao == 20){
+		int nk = 1;
+		
+		double fit = 0;
+		double rest = 0;
+		if(nivel == 1){
+			
+			int *path = ordenaSolucao(follower, maxNodes, startNode);
+
+			// cout << "path" << endl;
+			// for(int i = 0; i<MAX_NODES; i++){
+			// 	cout << path[i] << " ";
+			// }
+
+			for(int i = 0;path[i] != endNode; i++){
+				
+				int u,v;
+				u = path[i];
+				v = path[i+1];
 
 
+				if(cost[u][v] == 0){
+					cout << "Erro: u == v" << endl;
+					exit(1);
+				}
+				else if(cost[u][v] == INFINITY){
+					fit = INFINITY;
+				}
+				else{
+					int idx = u*maxNodes + v;
+					for(int k = 0; k < tollEdges.size(); k++){
+						if(tollEdges[k] == idx){
+							fit += ind[k]*nk;
+						}
+					}		
+				}
+			}
+			// if(fit != INFINITY){
+			// 	cout << "path" << endl;
+			// 	for(int i = 0; i<maxNodes; i++){
+			// 		cout << path[i] << " ";
+			// 	}
+			// 	cout << endl;
+			// 	cout << "fit lider: " << fit << endl;
+			// }
+			//Restricoes
+			delete [] path;
+			
+		}else if(nivel == 2){
+			
+			int *path = ordenaSolucao(ind, maxNodes, startNode);
+			
+			// cout << "path: ";
+			// for(int i = 0; i<maxNodes; i++){
+			// 	cout << path[i] << " ";
+			// }
+			// cout << endl;
+			
+			/* TODO
+			*/
 
+			for(int i = 0;path[i] != endNode; i++){
+				int u,v;
+				u = path[i];
+				v = path[i+1];
+
+				// cout << "u: " << u << " v: " << v << endl;
+				// cout << "cost[u][v]: " << cost[u][v] << endl;
+				// exit(1);
+
+				if(cost[u][v] == 0){
+					cout << "Erro: u == v" << endl;
+					exit(1);
+				}else if(cost[u][v] == INFINITY){
+					fit = INFINITY;
+					// TODO: CONTAR NÚMERO DE ARESTAS INFINITAS
+					rest = rest + 1;
+				}
+				else{
+					int idx = u*maxNodes + v;
+
+					auto first = tollEdges.begin();
+					auto last = tollEdges.end();
+
+					auto it = std::find(first, last, idx);
+
+					if(it != last){
+						for(int k = 0; k < tollEdges.size(); k++){
+							if(tollEdges[k] == idx){
+								fit += cost[u][v] + leader[k];
+							}
+						}
+					}else{
+						fit += cost[u][v];
+					}
+				}
+			}
+			// if(fit != INFINITY){
+			// 	cout << "path: ";
+			// 	for(int i = 0; i<maxNodes; i++){
+			// 		cout << path[i] << " ";
+			// 	}
+			// 	cout << endl;
+			// 	cout << "fit seguidor: " << fit << endl;
+			// }
+
+			delete [] path;
+
+		}
+		
+		ind[d] = fit;	
+		ind[d + 1] = rest;
+		//TODO: delete path;
+		
+	}
 }
 
 double getUpper(int nivel, int funcao, int indice){
@@ -1644,11 +1906,14 @@ double getUpper(int nivel, int funcao, int indice){
                     case 0: return 8;
                     case 1: return 100;
                 }
+		} else if (funcao == 20) { //x <= 1, y <= 1
+			return 1;
 
 	} else{
 		return 100;
 	}
 }
+
 
 double getLower(int nivel, int funcao, int indice){
 	
@@ -1782,7 +2047,11 @@ double getLower(int nivel, int funcao, int indice){
                     case 0: return 0;
                     case 1: return 0;
                 }
-        } else {
+        }else if(funcao == 20) { //x >= 0, y >= 0
+			return 0;
+		}
+		else {
                return 0;
         }
 }
+

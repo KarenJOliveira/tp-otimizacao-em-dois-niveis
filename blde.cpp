@@ -2,22 +2,42 @@
 #include "string.h"
 #include "stdlib.h"
 #include <iostream>
+#include <string>
+#include <fstream>
+#include <sstream>
+
 using namespace std;
 
 #define TESTE 0
 #define PENALTY 1
 
-int SIZEL, SIZEF;
-int GENL, GENF;
+int SIZEL, SIZEF; // tamanho da população para o líder e para o seguidor
+int GENL, GENF; // quantidade de gerações para o líder e para o seguidor
 int SEED;
 int FUNCAO;
-int DIML, DIMF;
-double F, CR;
+int DIML, DIMF; //DIMF: número de variáveis no problema do seguidor - DIML: número de variáveis do problema do líder
+double F, CR; //F: escala de mutação - CR: taxa de crossover
 int VARIANTE;
+
+int MAX_NODES;
+int MAX_EDGES;
+int MAX_TOLL_EDGES;
+int START_NODE;
+int END_NODE;
 
 #include "funcoes.h"
 
+//Matriz de custo das arestas
+double **cost;
+//Vetor de indices dos arcos com tarifa
+vector<int> tollEdges;
+
+void inicializaCusto(double **&cost, std::vector<int> &tollEdges, string filename);
+
+
+//Populacao para armazenar os valores iniciais do Leader
 double **popL;
+//Populacao para armazenar os valores da Leader após avaliação do Follower
 double **popLNova;
 //Populacao para armazenar os valores da Follower correspondentes ao Leader em popL
 double **popLValoresF;
@@ -27,6 +47,94 @@ void inicializa(double** &pop, int n, int d, int nivel = 2);
 
 //=============================================================================
 //=============================================================================
+
+void inicializaCusto(double ** &cost, std::vector<int> &tollEdges, string filename){
+	ifstream file;
+	file.open(filename.c_str(), ios::in);
+	if (!file.is_open()){
+		cerr << "Erro ao abrir arquivo de entrada" << endl;
+		exit(1);
+	}
+
+	string line;
+
+	file >> MAX_NODES;
+	file >> START_NODE >> END_NODE;
+	
+	getline(file, line); //Pula linha
+
+	//Inicializa matriz de custo das arestas
+	cost = new double*[MAX_NODES];
+	for(int i = 0; i < MAX_NODES; i++){
+		cost[i] = new double[MAX_NODES];
+		for(int j = 0; j < MAX_NODES; j++){
+			if(i != j)
+				cost[i][j] = INFINITY;
+			else{
+				cost[i][j] = 0;
+			}
+		}
+	}
+	
+	int cont = 0;
+	while(getline(file, line)){
+
+		// Ler a seção "Edges"
+		if(line == "Edges") {
+			while (getline(file, line) && !line.empty() && line != "TollEdges") {
+                stringstream ss(line);
+				int source, target; 
+				double weight;
+
+				ss >> source >> target >> weight;
+				
+				cost[source][target] = weight;
+				cost[target][source] = weight;
+            }
+		}
+
+		// Ler a seção "TollEdges"
+        if (line == "TollEdges") {
+            while (getline(file, line) && !line.empty()) {
+                stringstream ss(line);
+                int source, target;
+                ss >> source >> target;
+                int index = source * MAX_NODES + target;
+				tollEdges.push_back(index);
+				cont++;
+            }
+            break; 
+        }
+
+	}
+
+	MAX_TOLL_EDGES = cont;
+
+	file.close();
+
+	
+	
+	cout << "MAX_NODES: " << MAX_NODES << endl;
+	cout << "START_NODE: " << START_NODE << endl;
+	cout << "END_NODE: " << END_NODE << endl;
+
+	// cout << "Cost Matrix: " << endl;
+	// for(int i = 0; i < MAX_NODES; i++){
+	// 	for(int j = 0; j < MAX_NODES; j++){
+	// 		cout << cost[i][j] << " ";
+	// 	}
+	// 	cout << endl;
+	// }
+
+	cout << "Toll Edges: " << MAX_TOLL_EDGES << endl;
+	// for(int i = 0; i < tollEdges.size(); i++){
+	// 	cout << tollEdges[i] << " ";
+	// }
+	
+	//exit(1);
+	
+}
+
 void calculaVariancia(double **pop, double *var, int dim, int size){
         // variancias e medias de cada variavel
 	double *med = new double[dim];
@@ -49,6 +157,7 @@ void calculaVariancia(double **pop, double *var, int dim, int size){
 
         delete[] med;
 }
+
 //=============================================================================
 //=============================================================================
 
@@ -60,7 +169,9 @@ void calculaAptidao(double *ind, int d, int nivel, double *leader, double *follo
 		ind[d + 1] = RAND_MAX;
 		return;
 	}
-	calculaFuncao(ind, d, nivel, leader, follower, FUNCAO);
+	
+	calculaFuncao(ind, d, nivel, leader, follower, FUNCAO, cost, tollEdges, MAX_NODES, START_NODE, END_NODE);
+	
 }
 
 
@@ -99,7 +210,7 @@ int compara(double *ind1, double *ind2, int d, int nivel){
 		return 1;
 	} else if (ind1[d+1] > 0 && ind2[d + 1] <= 0){
 		return 0;
-	} else if (ind1[d+1] > 0 && ind2[d + 1] > 0){
+	} else if (ind1[d+1] > 0 && ind2[d + 1]  > 0){
 		if (ind1[d+1] <= ind2[d + 1]){
 			return 1;
 		} else {
@@ -111,6 +222,7 @@ int compara(double *ind1, double *ind2, int d, int nivel){
 	//Caso contrário usa <=
 	if (getTipo(FUNCAO, nivel) == 1){
 		if (ind1[d] <= ind2[d]){
+			
 			return 1;
 		} else {
 			return 0;
@@ -124,21 +236,26 @@ int compara(double *ind1, double *ind2, int d, int nivel){
 	}
 }
 
+
 int selecionaMelhor(double *ind, double **pop, int n, int d, int nivel){
     
 	int m = 0;
 	for(int j = 0; j < d + 2; j++){
-            ind[j] = pop[0][j];
+        ind[j] = pop[0][j];
 	}
-        
+    
 	for (int i = 1; i < n; i++){
-            if( compara(pop[i], ind, d, nivel) > 0 ){
-                for(int j = 0; j < d + 2; j++){
-                    ind[j] = pop[i][j];
-                    m = i;
-                }
+		
+        if( compara(pop[i], ind, d, nivel) > 0 ){
+			
+			//cout << "Pop: " << pop[i][d] << " Ind: " << ind[d] << endl;
+            for(int j = 0; j < d + 2; j++){
+                ind[j] = pop[i][j];
+                m = i;
             }
+        }
 	}
+	
 	return m;
 }
 
@@ -153,11 +270,15 @@ int iguais(double *ind1, double *ind2, int d){
         
 }
 
+//Determina valor do indivíduo do nível inferior (uF) com base no indivíduo do nível superior (uL)
 void deFollower(double *uL, double *uF){
 	
 	double **popF;
 	double **popFNova;
+	
 	inicializaFollower(popF, uL, SIZEF, DIMF);
+
+	
 	inicializa(popFNova, SIZEF, DIMF, 2);
 
         // variancias e medias de cada variavel
@@ -169,6 +290,12 @@ void deFollower(double *uL, double *uF){
 	for (int gF = 0; gF < GENF; gF++){
             
 		selecionaMelhor(uF, popF, SIZEF, DIMF, 2); //uF = melhor da populacao do seguidor
+		
+
+		//cout << "Geracao " << gF << endl;
+		// if(gF == 30){
+		// 	exit(1);
+		// }
 
 		for(int i = 0; i < SIZEL; i++){
 			
@@ -180,21 +307,21 @@ void deFollower(double *uL, double *uF){
 			for(int j = 0; j < DIMF; j++){
 				if (j == jRand || rand()/(float)RAND_MAX < CR){
                                     
-                                    if (VARIANTE == 1){
+                    if (VARIANTE == 1){
 					//DE/rand/1/bin
-					u[j] = popF[ind1][j] + F*(popF[ind2][j] - popF[ind3][j]);
-                                    } else if (VARIANTE == 2){
+						u[j] = popF[ind1][j] + F*(popF[ind2][j] - popF[ind3][j]);
+                    } else if (VARIANTE == 2){
 					//DE/best/1/bin
-					u[j] = uF[j] + F*(popF[ind2][j] - popF[ind3][j]);
-                                    } else if (VARIANTE == 3){
+						u[j] = uF[j] + F*(popF[ind2][j] - popF[ind3][j]);
+                    } else if (VARIANTE == 3){
 					//DE/target-to-rand/1/bin
-					u[j] = popF[i][j] + F*(popF[ind1][j] - popF[i][j]) + F*(popF[ind2][j] - popF[ind3][j]);
-                                    }
+						u[j] = popF[i][j] + F*(popF[ind1][j] - popF[i][j]) + F*(popF[ind2][j] - popF[ind3][j]);
+                    }
 
-                                    if (u[j] < getLower(2, FUNCAO, j)) //LOWER
-                                            u[j] = getLower(2, FUNCAO, j); 
-                                    else if (u[j] > getUpper(2, FUNCAO, j)) //UPPER
-                                            u[j] = getUpper(2, FUNCAO, j);
+                    if (u[j] < getLower(2, FUNCAO, j)) //LOWER
+                        u[j] = getLower(2, FUNCAO, j); 
+                    else if (u[j] > getUpper(2, FUNCAO, j)) //UPPER
+                        u[j] = getUpper(2, FUNCAO, j);
 
 				} else {
 					u[j] = popF[i][j];
@@ -203,16 +330,20 @@ void deFollower(double *uL, double *uF){
 
 			calculaAptidao(u, DIMF, 2, uL, u);
 			
-
-			if(compara(u, popF[i], DIMF, 1) > 0){
-                            for(int j = 0; j < DIMF + 2; j++){
-                                popFNova[i][j] = u[j];
-                            }
+			// cout << "Fit u: " << u[DIMF] << endl;
+			// cout << "Fit pop: " << popF[i][DIMF] << endl;
+			if(compara(u, popF[i], DIMF, 2) > 0){ //MUDANCA: MUDEI DE 1 PARA 2
+                for(int j = 0; j < DIMF + 2; j++){
+                    popFNova[i][j] = u[j];
+                }
 			} else {
-                            for(int j = 0; j < DIMF + 2; j++){
-                                popFNova[i][j] = popF[i][j];
-                            }
+                for(int j = 0; j < DIMF + 2; j++){
+                    popFNova[i][j] = popF[i][j];
+                }
 			}
+			//cout << "Fit popNova: " << popFNova[i][DIMF] << endl;
+
+			
 			delete[] u;
 		}              
                 
@@ -236,6 +367,8 @@ void deFollower(double *uL, double *uF){
 	}
 
 	selecionaMelhor(uF, popF, SIZEF, DIMF, 2);
+	// cout << "Melhor do seguidor: ";
+	// cout << "Fit: " << uF[DIMF] << endl;
 
 	for(int i = 0; i < SIZEF; i++){
 		delete[] popF[i];
@@ -261,38 +394,41 @@ void deLeader(){
 
 		int ind1, ind2, ind3;
 		selecionaIndividuos(ind1, ind2, ind3, i, SIZEL);
-		
-		double *u = new double[DIML + 2];
-		int jRand = rand()%DIML;
-		for(int j = 0; j < DIML; j++){
-                        if (j == jRand || rand()/(float)RAND_MAX < CR){
-                            
-                             if (VARIANTE == 1){
-                                //---------- DE/rand/1/bin
-                                u[j] = popL[ind1][j] + F*(popL[ind2][j] - popL[ind3][j]);
-                             } else if (VARIANTE == 2){
-                                //--------- DE/best/1/bin
-                                u[j] = uBest[j] + F*(popL[ind2][j] - popL[ind3][j]);
-                             } else if (VARIANTE = 3){
-                                //--------- DE/target-to-rand/1/bin
-                                u[j] = popL[i][j] + F*(popL[ind1][j] - popL[i][j]) + F*(popL[ind2][j] - popL[ind3][j]);
-                             }
-                             
-                        } else {
-                                u[j] = popL[i][j];
-                        }
-                        //u[j] = (int)u[j];
-                        if (u[j] < getLower(1, FUNCAO, j))//LOWER
-                                u[j] = getLower(1, FUNCAO, j);
-                        else if (u[j] > getUpper(1, FUNCAO, j)) //UPPER
-                                u[j] = getUpper(1, FUNCAO, j);
 
+		double *u = new double[DIML + 2];
+		
+		int jRand = rand()%DIML;
+
+		for(int j = 0; j < DIML; j++){
+            if (j == jRand || rand()/(float)RAND_MAX < CR){
+                
+                if (VARIANTE == 1){
+                   //---------- DE/rand/1/bin
+                   u[j] = popL[ind1][j] + F*(popL[ind2][j] - popL[ind3][j]);
+                } else if (VARIANTE == 2){
+                   //--------- DE/best/1/bin
+                   u[j] = uBest[j] + F*(popL[ind2][j] - popL[ind3][j]);
+                } else if (VARIANTE = 3){
+                   //--------- DE/target-to-rand/1/bin
+                   u[j] = popL[i][j] + F*(popL[ind1][j] - popL[i][j]) + F*(popL[ind2][j] - popL[ind3][j]);
+                }
+                 
+            } else {
+                u[j] = popL[i][j];
+            }
+            //u[j] = (int)u[j];
+            if (u[j] < getLower(1, FUNCAO, j))//LOWER
+                u[j] = getLower(1, FUNCAO, j);
+            else if (u[j] > getUpper(1, FUNCAO, j)) //UPPER
+                u[j] = getUpper(1, FUNCAO, j);
 
 		}
 
-		double *uF = new double[DIMF + 2];
-		deFollower(u, uF);
+		double *uF = new double[DIMF + 2]; //uF = melhor da populacao do seguidor
+		deFollower(u, uF); //retorna o melhor indivíduo do nível inferior
 
+
+		//uF é usado para avaliar o indivíduo do nível superior
 		if ( (iguais(u, popL[i], DIML) == 1) && (iguais(uF, popLValoresF[i], DIMF) == 0) ){
 			if (compara(uF, popLValoresF[i], DIMF, 2) > 0){
 				for(int j = 0; j < DIMF + 2; j++){
@@ -355,48 +491,84 @@ void imprimeCabecalho(){
 	cout << "fitFollower fitFollowerValue constFollower constFollowerValue" << " nEvalL nEvalF" << endl;
 }
 
+void geraArquivoResultados(string& filename, int g, int m,  double *uL, int *path){
+	ofstream outFile;
+	outFile.open(filename.c_str(), ios::app);
+
+	cout << "chegou aqui" << endl;
+    if (!outFile.is_open()) {
+        cerr << "Erro ao abrir o arquivo de saída" << endl;
+        return;
+    }
+
+    outFile << "G-" << g << " [Leader] ";
+    for (int j = 0; j < DIML; j++) {
+        outFile << uL[j] << " ";
+    }
+    outFile << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
+
+    for (int j = 0; j < DIMF; j++) {
+        outFile << path[j] << " ";
+    }
+
+    outFile << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF + 1] << " " << getNEval(1) << " " << getNEval(2) << endl;
+
+    outFile.close();
+}
+
 void inicializaFollower(double** &pop, double *leader, int n, int d){
     
 	pop = new double*[n];
+	
 	for (int i = 0; i < n; i++){
 		pop[i] = new double[d + 2];
 		for(int j = 0; j < d; j++){
+			
 			pop[i][j] = getLower(2, FUNCAO, j) + (rand()/(double)RAND_MAX)*(getUpper(2, FUNCAO, j) - getLower(2, FUNCAO, j)); //UPPER - LOWER2
+			
 		}
+		
 		calculaAptidao(pop[i], d, 2, leader, pop[i]);
 	}
 }
 
+// pop
+// n: tamanho da população
+// d: quantidade de variáveis
+// nivel: 1 para líder e 2 para seguidor
 void inicializa(double** &pop, int n, int d, int nivel){
 
 	pop = new double*[n];
 
 	for (int i = 0; i < n; i++){
-            
+   
 		pop[i] = new double[d + 2];
+
 		for(int j = 0; j < d; j++){
 			pop[i][j] = getLower(nivel, FUNCAO, j) + (rand()/(double)RAND_MAX)*(getUpper(nivel, FUNCAO, j) - getLower(nivel, FUNCAO, j)); //UPPER - LOWER
+			
 		}
 
-		if (nivel == 1){ //se lider, determina valores do seguidor
 
+		if (nivel == 1){ //se lider, determina valores do seguidor
+			
 			deFollower(pop[i], popLValoresF[i]);                   
-                
+               
 			calculaAptidao(pop[i], DIML, 1, pop[i], popLValoresF[i]);
-                        
+            
 			if (popLValoresF[i][DIMF+1] > 0){
 				pop[i][DIML+1] = pop[i][DIML+1] + PENALTY*popLValoresF[i][DIMF+1];
 			}
                         
 		} else {
-                        calculaAptidao(pop[i], d, 0, NULL, NULL);
+            calculaAptidao(pop[i], d, 0, NULL, NULL);
 		}
 	}
 
 
 }
 
-void BlDE(){
+void BlDE(string& filename){
 	imprimeCabecalho();
         
         // variancias e medias de cada variavel (critério de parada do leader)
@@ -405,21 +577,34 @@ void BlDE(){
 
 	calculaVariancia(popL, var_inicial, DIML, SIZEL);
 
+	int *path;
 	for(int g = 0; g < GENL; g++){
 		
 		deLeader();
 	
 		double *uL = new double[DIML + 2];
 		int m = selecionaMelhor(uL, popL, SIZEL, DIML, 2);
+		
 		cout << "G-" << g << " [Leader] ";
 		for(int j = 0; j < DIML; j++){
 			cout << uL[j] << " ";
 		}
 		cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML+1] << " [Follower] ";
+
+		// cout << endl;
+		// for(int i=0;i<DIMF;i++){
+		// 	cout << popLValoresF[m][i] << " ";
+		// }
+		// cout << endl;
+		path = ordenaSolucao(popLValoresF[m], MAX_NODES, START_NODE);
 		for(int j = 0; j < DIMF; j++){
-			cout << popLValoresF[m][j] << " ";
+			cout << path[j] << " ";
 		}
+		
 		cout << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF+1] << " " << getNEval(1) << " " << getNEval(2) << endl;
+		
+		//geraArquivoResultados(filename, g, m, uL, path);
+		
 		delete[] uL;
                 
                 //critério de parada
@@ -431,8 +616,16 @@ void BlDE(){
 //		if (soma_total < 0.000001){
 //			break;
 //		}
+
+
+		// if(g == 5){
+		// 	exit(1);
+		// }
 		
 	}
+	ofstream file;
+	file.open("grafo.dot", ios::out);
+	printDOT(file, cost, MAX_NODES, path, tollEdges, END_NODE);
 }
 
 int main(int argc, char *argv[]){
@@ -445,6 +638,9 @@ int main(int argc, char *argv[]){
     double F, CR;
     int VARIANTE;*/
     
+	string inFile = "";
+	string outFile = "";
+
     for(int i = 0; i < argc; i++){
         if (strcmp(argv[i], "-genL") == 0){
                 GENL  = atoi(argv[++i]);
@@ -464,18 +660,33 @@ int main(int argc, char *argv[]){
                 CR = atof(argv[++i]);
         } else if (strcmp(argv[i], "-Var") == 0){
                 VARIANTE = atoi(argv[++i]);
-        }
+        } else if (strcmp(argv[i], "-inFile") == 0){
+				inFile = argv[++i];
+		} else if (strcmp(argv[i], "-outFile") == 0){
+				outFile = argv[++i];
+		}
     }
-
+	
+	inicializaCusto(cost, tollEdges, inFile);
+	
     srand(SEED);
 
-    DIML = getDimensao(FUNCAO, 1);
-    DIMF = getDimensao(FUNCAO, 2);
-
-    inicializa(popLValoresF, SIZEL, DIMF, 2); 
-    inicializa(popL, SIZEL, DIML, 1);
+    DIML = getDimensao(FUNCAO, 1, MAX_NODES, MAX_TOLL_EDGES);
+    DIMF = getDimensao(FUNCAO, 2, MAX_NODES, MAX_TOLL_EDGES);	
+	
+	
+    inicializa(popLValoresF, SIZEL, DIMF, 2); //Inicializa vetor do nível inferior com valores aleatórios
+	
+    inicializa(popL, SIZEL, DIML, 1); //Inicializa vetor do nível superior com valores aleatórios
+	//cout << "chegou aqui 1" << endl;
     inicializa(popLNova, SIZEL, DIML, 2);
-
-    BlDE();
-
+	//cout << "chegou aqui 1" << endl;
+	
+    BlDE(outFile);
+	
+	for(int i = 0; i < MAX_NODES; i++){
+		delete[] cost[i];
+	}
+	delete[] cost;
+	
 }
