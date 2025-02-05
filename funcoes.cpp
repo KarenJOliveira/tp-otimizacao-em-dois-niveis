@@ -33,7 +33,7 @@ int getNEval(int nivel){
 		return nEvalF;
 }
 
-int getDimensao(int funcao, int nivel, int maxNodes, int maxTollEdges){
+int getDimensao(int funcao, int nivel, int maxNodes, int maxTollEdges, int maxCommodities){
 	switch(funcao){
 		case 1001: //SMD1 -Deb
 			if (nivel == 1){
@@ -218,7 +218,7 @@ int getDimensao(int funcao, int nivel, int maxNodes, int maxTollEdges){
 			if (nivel == 1){
 				return maxTollEdges;
 			} else if (nivel == 2){
-				return maxNodes;
+				return maxNodes*maxCommodities;
 			}
 	}
 }
@@ -435,6 +435,7 @@ int* copyUntilElement(int* path, int length, int element, int& newLength) {
     return newArray;
 }
 
+/*
 void printDOT(ofstream &file, double **&cost, int maxNodes, int *path, vector<int> tollEdges, int endNode){
 	int newLength = 0;
 	int *shortPath = copyUntilElement(path, maxNodes, endNode, newLength);
@@ -468,70 +469,46 @@ void printDOT(ofstream &file, double **&cost, int maxNodes, int *path, vector<in
 	file << "}" << endl;
 }
 
-bool ehTarifado(int source, int target, vector<int> tollEdges, int maxNodes){
-	int index = source * maxNodes + target;
-	if(find(tollEdges.begin(), tollEdges.end(), index) != tollEdges.end()){
-		return true;
-	}
-	return false;
+*/
+
+
+int* sortIndicesByChunks(double *sol, int maxNodes, map<pair<int,int>, double> commodities) {
+	int parts = commodities.size();
+	int n = maxNodes * parts;
+    int *solucao = new int[n];
+    int chunkSize = maxNodes;
+    auto it = commodities.begin();
+
+    for (int i = 0; i < parts; ++i) {
+        int start = i * chunkSize;
+        int end = start + chunkSize;
+        
+        pair<double, int> chunk[chunkSize];
+        for (int j = start; j < end; ++j) {
+            chunk[j - start] = make_pair(sol[j], j - start);
+        }
+        
+        sort(chunk, chunk + chunkSize);
+
+		
+        
+        solucao[start] = it->first.first;
+		
+        int index = 1;
+        for (int j = 0; j < chunkSize; ++j) {
+            if (chunk[j].second != it->first.first) {
+                solucao[start + index] = chunk[j].second;
+                index++;
+            }
+        }
+
+		it++;
+    }
+    
+    return solucao;
 }
 
-
-int *ordenaSolucao(double *solucao, int maxNodes, int startNode){
-
-	int numNodes = maxNodes;
-	int *solucaoIndices = new int[numNodes];
-	double *temp = new double[numNodes];
-	
-	for(int i=0;i<numNodes;i++){
-		temp[i] = solucao[i];
-		solucaoIndices[i] = i;
-	}
-
-	// for(int i=0;i<numNodes;i++){
-	// 	cout << solucao[i] << " ";
-	// }
-	
-	for(int i=0;i<numNodes;i++){
-		for(int j=0;j<numNodes;j++){
-			if(temp[solucaoIndices[i]] < temp[solucaoIndices[j]]){
-				int aux = solucaoIndices[i];
-				solucaoIndices[i] = solucaoIndices[j];
-				solucaoIndices[j] = aux;
-			}
-		}
-	}
-	// cout << endl;
-	// for(int i=0;i<numNodes;i++){
-	// 	cout << solucaoIndices[i] << " ";
-	// }
-	// exit(1);
-
-	int element_to_move;
-	for(int i=0;i<numNodes;i++){
-		if(solucaoIndices[i] == startNode){
-			element_to_move = i;
-			break;
-		}
-	}
-	
-	int aux;
-	for(int i=element_to_move;i>0;i--){
-		//cout << i << endl;
-		aux = solucaoIndices[i];
-		solucaoIndices[i] = solucaoIndices[i-1];
-		solucaoIndices[i-1] = aux;
-	}
-
-	// for(int i=0;i<numNodes;i++){
-	// 	cout << solucaoIndices[i] << " ";
-	// }
-
-	delete [] temp;
-	return solucaoIndices;
-}
-
-void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follower, int funcao, double **cost, vector<int> tollEdges, int maxNodes, int startNode, int endNode){
+void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follower, int funcao, double **cost, vector<int> tollEdges, int maxNodes, map<pair<int,int>, double> commodities){
 
 	//Incrementa o numero de chamadas à função
 	if (nivel == 1)
@@ -1665,113 +1642,120 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
 		double rest = 0;
 		if(nivel == 1){
 			
-			int *path = ordenaSolucao(follower, maxNodes, startNode);
+			int *path = sortIndicesByChunks(follower, maxNodes, commodities);
 
-			// cout << "path" << endl;
-			// for(int i = 0; i<MAX_NODES; i++){
-			// 	cout << path[i] << " ";
-			// }
+			int size = maxNodes*commodities.size();
+			int cont = 0;
+			for(auto it = commodities.begin(); it != commodities.end(); it++){
+				int source = it->first.first;
+				int target = it->first.second;
+				int demand = it->second;
 
-			for(int i = 0;path[i] != endNode; i++){
-				
-				int u,v;
-				u = path[i];
-				v = path[i+1];
+				int start = cont*maxNodes;
+				for(int i=start;i<size-1;i++)
+				{
 
+					int u = path[i];
+					int v = path[i+1];
 
-				if(cost[u][v] == 0){
-					cout << "Erro: u == v" << endl;
-					exit(1);
-				}
-				else if(cost[u][v] == INFINITY){
-					fit = INFINITY;
-				}
-				else{
-					int idx = u*maxNodes + v;
-					for(int k = 0; k < tollEdges.size(); k++){
-						if(tollEdges[k] == idx){
-							fit += ind[k]*nk;
+					if(cost[u][v] == 0){
+						cout << "Erro: u == v" << endl;
+						exit(1);
+					}
+					else if(cost[u][v] == INFINITY){
+						fit = INFINITY;
+						rest = rest+1;
+					}
+					else{
+						int idx = u*maxNodes + v;
+
+						auto first = tollEdges.begin();
+						auto last = tollEdges.end();
+
+						auto it = std::find(first, last, idx);
+
+						if(it != last){
+							int k = distance(first, it);
+							fit += ind[k]*demand;
 						}
-					}		
+					}
 				}
+					
 			}
-			// if(fit != INFINITY){
-			// 	cout << "path" << endl;
-			// 	for(int i = 0; i<maxNodes; i++){
-			// 		cout << path[i] << " ";
-			// 	}
-			// 	cout << endl;
-			// 	cout << "fit lider: " << fit << endl;
-			// }
-			//Restricoes
+
 			delete [] path;
 			
 		}else if(nivel == 2){
-			
-			int *path = ordenaSolucao(ind, maxNodes, startNode);
-			
-			// cout << "path: ";
-			// for(int i = 0; i<maxNodes; i++){
+
+			// for(int i=0;i<maxNodes*commodities.size();i++){
+			// 	cout << ind[i] << " ";
+			// }
+			// cout << endl;
+
+			int *path = sortIndicesByChunks(ind, maxNodes, commodities);
+
+			// for(int i=0;i<maxNodes*commodities.size();i++){
 			// 	cout << path[i] << " ";
 			// }
 			// cout << endl;
 			
-			/* TODO
-			*/
+			int size = maxNodes*commodities.size();
+			int cont = 0;
+			for(auto it = commodities.begin(); it != commodities.end(); it++){
+				int source = it->first.first;
+				int target = it->first.second;
+				int demand = it->second;
 
-			for(int i = 0;path[i] != endNode; i++){
-				int u,v;
-				u = path[i];
-				v = path[i+1];
+				//cout << "Source: " << source << " Target: " << target <<  endl;
+				int start = cont*maxNodes;
+				for(int i=start;i<size-1;i++)
+				{	
 
-				// cout << "u: " << u << " v: " << v << endl;
-				// cout << "cost[u][v]: " << cost[u][v] << endl;
-				// exit(1);
+					if(path[i] == target){
+						break;
+					}
 
-				if(cost[u][v] == 0){
-					cout << "Erro: u == v" << endl;
-					exit(1);
-				}else if(cost[u][v] == INFINITY){
-					fit = INFINITY;
-					// TODO: CONTAR NÚMERO DE ARESTAS INFINITAS
-					rest = rest + 1;
-				}
-				else{
-					int idx = u*maxNodes + v;
 
-					auto first = tollEdges.begin();
-					auto last = tollEdges.end();
+					int u = path[i];
+					int v = path[i+1];
 
-					auto it = std::find(first, last, idx);
+					//cout << "u: " << u << " v: " << v << endl;
+					//cout << "Cost: " << cost[u][v] << endl;
 
-					if(it != last){
-						for(int k = 0; k < tollEdges.size(); k++){
-							if(tollEdges[k] == idx){
-								fit += cost[u][v] + leader[k];
-							}
+					if(cost[u][v] == 0){
+						cout << "Erro: u == v" << endl;
+						exit(1);
+					}
+					else if(cost[u][v] == INFINITY){
+						fit = INFINITY;
+						rest = rest+1;
+					}
+					else{
+						int idx = u*maxNodes + v;
+
+						auto first = tollEdges.begin();
+						auto last = tollEdges.end();
+
+						auto it = std::find(first, last, idx);
+
+						if(it != last){
+							int k = distance(first, it);
+							fit += cost[u][v] + leader[k];
+						}else{
+							fit += cost[u][v];
 						}
-					}else{
-						fit += cost[u][v];
 					}
 				}
+				cont++;	
 			}
-			// if(fit != INFINITY){
-			// 	cout << "path: ";
-			// 	for(int i = 0; i<maxNodes; i++){
-			// 		cout << path[i] << " ";
-			// 	}
-			// 	cout << endl;
-			// 	cout << "fit seguidor: " << fit << endl;
-			// }
+			
 
 			delete [] path;
 
 		}
-		
+		 //exit(1);
 		ind[d] = fit;	
 		ind[d + 1] = rest;
-		//TODO: delete path;
-		
 	}
 }
 

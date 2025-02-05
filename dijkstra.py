@@ -77,53 +77,60 @@ def is_connected(graph):
     return len(visited) == len(graph)
 
 
-def find_path_and_write_to_file(num_nodes, max_edges, filename):
-    while True:
+def find_paths_and_write_to_file(num_nodes, max_edges, filename, num_pairs):
+    pairs = []
+    while len(pairs) < num_pairs:
         start_vertex = random.randint(0, num_nodes - 1)
         end_vertex = random.randint(0, num_nodes - 1)
         while start_vertex == end_vertex:
             end_vertex = random.randint(0, num_nodes - 1)
+        pairs.append((start_vertex, end_vertex))
 
-        graph,edges_set = generate_random_graph(num_nodes, max_edges)
+    while True:
+        graph, edges_set = generate_random_graph(num_nodes, max_edges)
 
         if not is_connected(graph):
             continue
 
-        path = dijkstra(graph, start_vertex, end_vertex)
-        print(graph)
-        print(path)
+        with open(filename, 'w') as file:
+            file.write(f"{num_nodes}\n")
+            file.write("\nPairs\n")
+            for start_vertex, end_vertex in pairs:
+                file.write(f"{start_vertex} {end_vertex} 1\n")
 
-        if path:
-            with open(filename, 'w') as file:
-                file.write(f"{num_nodes}\n")
-                file.write(f"{start_vertex} {end_vertex}\n")
-                file.write("\nEdges\n")
+            file.write("\nEdges\n")
+            for u in graph:
+                for v, cost in graph[u].items():
+                    if u < v:  # To avoid writing both (u, v) and (v, u)
+                        file.write(f"{u} {v} {cost}\n")
 
-                for u in graph:
-                    for v, cost in graph[u].items():
-                        if u < v:  # To avoid writing both (u, v) and (v, u)
-                            file.write(f"{u} {v} {cost}\n")
+        all_paths = []
+        for start_vertex, end_vertex in pairs:
+            path = dijkstra(graph, start_vertex, end_vertex)
+            if path:
+                all_paths.append(path)
+                print(f"Path from {start_vertex} to {end_vertex}: {path}")
 
+        if all_paths:
             # Cria um conjunto de arestas do caminho
-            path_edges = set((path[i], path[i+1]) if path[i] < path[i+1] else (path[i+1], path[i]) for i in range(len(path) - 1))
+            path_edges = set((path[i], path[i+1]) if path[i] < path[i+1] else (path[i+1], path[i]) for path in all_paths for i in range(len(path) - 1))
 
             # Remove as arestas do caminho de edges_set
             edges_set -= path_edges
 
-            toll_edges = random.sample(list(edges_set), min(max_toll_edges, len(edges_set)))
+            # Remove edges in both directions from toll_edges
+            toll_edges = [edge for edge in edges_set if (edge[0], edge[1]) not in path_edges and (edge[1], edge[0]) not in path_edges]
+            toll_edges = random.sample(toll_edges, min(max_toll_edges, len(toll_edges)))
+
             with open(filename, 'a') as file:
                 file.write("\nTollEdges\n")
                 for u, v in toll_edges:
                     file.write(f"{u} {v}\n")
             break
-        
 
-number_of_nodes = 60
-max_number_of_edges = 208
-max_toll_edges = 42
-#graph, edges_set = generate_random_graph(number_of_nodes,  max_number_of_edges)
-# print(graph)
-# print(edges_set)
+number_of_nodes = 20
+max_number_of_edges = 50
+max_toll_edges = 10
+num_pairs = 5
 
-
-find_path_and_write_to_file(number_of_nodes, max_number_of_edges, 'instancia20.txt')
+find_paths_and_write_to_file(number_of_nodes, max_number_of_edges, 'instancia2_multi.txt', num_pairs)

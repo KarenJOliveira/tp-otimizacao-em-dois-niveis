@@ -31,6 +31,8 @@ int END_NODE;
 double **cost;
 //Vetor de indices dos arcos com tarifa
 vector<int> tollEdges;
+//Dicionário de commodities e a demanda associada
+map<pair<int,int>,double> commodities;
 
 void inicializaCusto(double **&cost, std::vector<int> &tollEdges, string filename);
 
@@ -59,7 +61,10 @@ void inicializaCusto(double ** &cost, std::vector<int> &tollEdges, string filena
 	string line;
 
 	file >> MAX_NODES;
-	file >> START_NODE >> END_NODE;
+	
+	
+	//file >> START_NODE >> END_NODE;
+
 	
 	getline(file, line); //Pula linha
 
@@ -78,6 +83,15 @@ void inicializaCusto(double ** &cost, std::vector<int> &tollEdges, string filena
 	
 	int cont = 0;
 	while(getline(file, line)){
+		//Ler a seção "Pairs"
+		if(line == "Pairs"){
+			while (getline(file, line) && !line.empty() && line != "Edges") {
+				stringstream ss(line);
+				int source, target, demand;
+				ss >> source >> target >> demand;
+				commodities[make_pair(source, target)] = demand;
+			}
+		}
 
 		// Ler a seção "Edges"
 		if(line == "Edges") {
@@ -115,9 +129,13 @@ void inicializaCusto(double ** &cost, std::vector<int> &tollEdges, string filena
 	
 	
 	cout << "MAX_NODES: " << MAX_NODES << endl;
-	cout << "START_NODE: " << START_NODE << endl;
-	cout << "END_NODE: " << END_NODE << endl;
-
+	//cout << "START_NODE: " << START_NODE << endl;
+	//cout << "END_NODE: " << END_NODE << endl;
+	cout << "Commodities: " << commodities.size() << endl;
+	for(auto it = commodities.begin(); it != commodities.end(); it++){
+		cout << it->first.first << " " << it->first.second << " " << it->second << endl;
+	}
+	
 	// cout << "Cost Matrix: " << endl;
 	// for(int i = 0; i < MAX_NODES; i++){
 	// 	for(int j = 0; j < MAX_NODES; j++){
@@ -170,7 +188,7 @@ void calculaAptidao(double *ind, int d, int nivel, double *leader, double *follo
 		return;
 	}
 	
-	calculaFuncao(ind, d, nivel, leader, follower, FUNCAO, cost, tollEdges, MAX_NODES, START_NODE, END_NODE);
+	calculaFuncao(ind, d, nivel, leader, follower, FUNCAO, cost, tollEdges, MAX_NODES, commodities);
 	
 }
 
@@ -276,8 +294,9 @@ void deFollower(double *uL, double *uF){
 	double **popF;
 	double **popFNova;
 	
+	//cout << "!!!3" << endl; 
 	inicializaFollower(popF, uL, SIZEF, DIMF);
-
+	
 	
 	inicializa(popFNova, SIZEF, DIMF, 2);
 
@@ -539,7 +558,7 @@ void inicializaFollower(double** &pop, double *leader, int n, int d){
 void inicializa(double** &pop, int n, int d, int nivel){
 
 	pop = new double*[n];
-
+	
 	for (int i = 0; i < n; i++){
    
 		pop[i] = new double[d + 2];
@@ -548,14 +567,13 @@ void inicializa(double** &pop, int n, int d, int nivel){
 			pop[i][j] = getLower(nivel, FUNCAO, j) + (rand()/(double)RAND_MAX)*(getUpper(nivel, FUNCAO, j) - getLower(nivel, FUNCAO, j)); //UPPER - LOWER
 			
 		}
-
-
+ 
 		if (nivel == 1){ //se lider, determina valores do seguidor
 			
 			deFollower(pop[i], popLValoresF[i]);                   
-               
+            //cout << "!!!" << endl;   
 			calculaAptidao(pop[i], DIML, 1, pop[i], popLValoresF[i]);
-            
+             //cout << "!!!1" << endl;   
 			if (popLValoresF[i][DIMF+1] > 0){
 				pop[i][DIML+1] = pop[i][DIML+1] + PENALTY*popLValoresF[i][DIMF+1];
 			}
@@ -596,7 +614,7 @@ void BlDE(string& filename){
 		// 	cout << popLValoresF[m][i] << " ";
 		// }
 		// cout << endl;
-		path = ordenaSolucao(popLValoresF[m], MAX_NODES, START_NODE);
+		path = sortIndicesByChunks(popLValoresF[m], MAX_NODES, commodities);
 		for(int j = 0; j < DIMF; j++){
 			cout << path[j] << " ";
 		}
@@ -618,14 +636,14 @@ void BlDE(string& filename){
 //		}
 
 
-		// if(g == 5){
-		// 	exit(1);
-		// }
+		if(g == 2){
+			exit(1);
+		}
 		
 	}
 	ofstream file;
 	file.open("grafo.dot", ios::out);
-	printDOT(file, cost, MAX_NODES, path, tollEdges, END_NODE);
+	//printDOT(file, cost, MAX_NODES, path, tollEdges, END_NODE);
 }
 
 int main(int argc, char *argv[]){
@@ -671,16 +689,16 @@ int main(int argc, char *argv[]){
 	
     srand(SEED);
 
-    DIML = getDimensao(FUNCAO, 1, MAX_NODES, MAX_TOLL_EDGES);
-    DIMF = getDimensao(FUNCAO, 2, MAX_NODES, MAX_TOLL_EDGES);	
-	
+    DIML = getDimensao(FUNCAO, 1, MAX_NODES, MAX_TOLL_EDGES, commodities.size());
+    DIMF = getDimensao(FUNCAO, 2, MAX_NODES, MAX_TOLL_EDGES, commodities.size());	
+	//cout << "chegou aqui " << endl;
 	
     inicializa(popLValoresF, SIZEL, DIMF, 2); //Inicializa vetor do nível inferior com valores aleatórios
-	
+	//cout << "chegou aqui 1" << endl;
     inicializa(popL, SIZEL, DIML, 1); //Inicializa vetor do nível superior com valores aleatórios
-	//cout << "chegou aqui 1" << endl;
+	//cout << "chegou aqui 2" << endl;
     inicializa(popLNova, SIZEL, DIML, 2);
-	//cout << "chegou aqui 1" << endl;
+	//cout << "chegou aqui 3" << endl;
 	
     BlDE(outFile);
 	
