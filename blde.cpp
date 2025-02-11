@@ -636,9 +636,9 @@ void BlDE(string& filename){
 //		}
 
 
-		if(g == 2){
-			exit(1);
-		}
+		// if(g == 2){
+		// 	exit(1);
+		// }
 		
 	}
 	ofstream file;

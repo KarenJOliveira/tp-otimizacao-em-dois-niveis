@@ -1636,13 +1636,17 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
 	}
 	//Problema de tarifação
 	else if(funcao == 20){
-		int nk = 1;
 		
 		double fit = 0;
 		double rest = 0;
 		if(nivel == 1){
-			
+			//cout << "Leader" << endl;
 			int *path = sortIndicesByChunks(follower, maxNodes, commodities);
+
+			// for(int i=0;i<maxNodes*commodities.size();i++){
+			// 	cout << path[i] << " ";
+			// }
+			// cout << endl;
 
 			int size = maxNodes*commodities.size();
 			int cont = 0;
@@ -1651,12 +1655,21 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
 				int target = it->first.second;
 				int demand = it->second;
 
+				//cout << "Source: " << source << " Target: " << target <<  endl;
+
 				int start = cont*maxNodes;
 				for(int i=start;i<size-1;i++)
 				{
 
+					if(path[i] == target){
+						break;
+					}
+
 					int u = path[i];
 					int v = path[i+1];
+
+					// cout << "u: " << u << " v: " << v << endl;
+					// cout << "Cost: " << cost[u][v] << endl;
 
 					if(cost[u][v] == 0){
 						cout << "Erro: u == v" << endl;
@@ -1680,13 +1693,13 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
 						}
 					}
 				}
-					
+				cont++;		
 			}
 
 			delete [] path;
 			
 		}else if(nivel == 2){
-
+			//cout << "Follower" << endl;
 			// for(int i=0;i<maxNodes*commodities.size();i++){
 			// 	cout << ind[i] << " ";
 			// }
