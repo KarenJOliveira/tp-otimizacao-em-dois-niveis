@@ -1676,7 +1676,7 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
 						exit(1);
 					}
 					else if(cost[u][v] == INFINITY){
-						fit = INFINITY;
+						//fit = INFINITY;
 						rest = rest+1;
 					}
 					else{
@@ -1740,7 +1740,8 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
 						exit(1);
 					}
 					else if(cost[u][v] == INFINITY){
-						fit = INFINITY;
+						//cout << u << " " << v << " inf" << endl;
+						//fit = INFINITY;
 						rest = rest+1;
 					}
 					else{

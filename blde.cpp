@@ -514,23 +514,23 @@ void geraArquivoResultados(string& filename, int g, int m,  double *uL, int *pat
 	ofstream outFile;
 	outFile.open(filename.c_str(), ios::app);
 
-	cout << "chegou aqui" << endl;
+	//cout << "chegou aqui" << endl;
     if (!outFile.is_open()) {
         cerr << "Erro ao abrir o arquivo de saída" << endl;
         return;
     }
 
     outFile << "G-" << g << " [Leader] ";
-    for (int j = 0; j < DIML; j++) {
-        outFile << uL[j] << " ";
-    }
+    // for (int j = 0; j < DIML; j++) {
+    //     outFile << uL[j] << " ";
+    // }
     outFile << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
 
     for (int j = 0; j < DIMF; j++) {
         outFile << path[j] << " ";
     }
 
-    outFile << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF + 1] << " " << getNEval(1) << " " << getNEval(2) << endl;
+    outFile << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF + 1]  << endl;
 
     outFile.close();
 }
@@ -621,7 +621,7 @@ void BlDE(string& filename){
 		
 		cout << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF+1] << " " << getNEval(1) << " " << getNEval(2) << endl;
 		
-		//geraArquivoResultados(filename, g, m, uL, path);
+		geraArquivoResultados(filename, g, m, uL, path);
 		
 		delete[] uL;
                 
@@ -636,7 +636,7 @@ void BlDE(string& filename){
 //		}
 
 
-		// if(g == 2){
+		// if(g == 1){
 		// 	exit(1);
 		// }
 		
@@ -684,7 +684,7 @@ int main(int argc, char *argv[]){
 				outFile = argv[++i];
 		}
     }
-	
+	//Aumentar GENF
 	inicializaCusto(cost, tollEdges, inFile);
 	
     srand(SEED);
