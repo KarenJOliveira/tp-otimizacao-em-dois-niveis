@@ -2046,7 +2046,7 @@ double getLower(int nivel, int funcao, int indice){
                     case 1: return 0;
                 }
         }else if(funcao == 20) { //x >= 0, y >= 0
-			return 0;
+			return 0.1;
 		}
 		else {
                return 0;
