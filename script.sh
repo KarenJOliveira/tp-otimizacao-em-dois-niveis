@@ -6,7 +6,7 @@ exe_file="./blde.exe"
 seed_base=2
 
 
-for ((j=20; j<=60; j+=5)); do
+for ((j=40; j<=60; j+=5)); do
     qnt=0
     for c in 20 30 40; do
         ((qnt+=1))
