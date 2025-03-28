@@ -493,7 +493,7 @@ void deLeader(){
 		}
 	}
 
-	cout << endl;
+	//cout << endl;
 
 	delete[] uBest;
 }
@@ -520,17 +520,9 @@ void geraArquivoResultados(string& filename, int g, int m,  double *uL, int *pat
         return;
     }
 
-    outFile << "G-" << g << " [Leader] ";
-    // for (int j = 0; j < DIML; j++) {
-    //     outFile << uL[j] << " ";
-    // }
-    outFile << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
+    outFile << uL[DIML] << "," << uL[DIML + 1] << ",";
 
-    for (int j = 0; j < DIMF; j++) {
-        outFile << path[j] << " ";
-    }
-
-    outFile << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF + 1]  << endl;
+    outFile << popLValoresF[m][DIMF] << "," << popLValoresF[m][DIMF + 1]  << endl;
 
     outFile.close();
 }
@@ -587,7 +579,7 @@ void inicializa(double** &pop, int n, int d, int nivel){
 }
 
 void BlDE(string& filename){
-	imprimeCabecalho();
+	//imprimeCabecalho();
         
         // variancias e medias de cada variavel (critério de parada do leader)
         double *var_inicial = new double[DIML];
@@ -603,23 +595,23 @@ void BlDE(string& filename){
 		double *uL = new double[DIML + 2];
 		int m = selecionaMelhor(uL, popL, SIZEL, DIML, 2);
 		
-		cout << "G-" << g << " [Leader] ";
-		for(int j = 0; j < DIML; j++){
-			cout << uL[j] << " ";
-		}
-		cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML+1] << " [Follower] ";
+		// cout << "G-" << g << " [Leader] ";
+		// for(int j = 0; j < DIML; j++){
+		// 	cout << uL[j] << " ";
+		// }
+		//cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML+1] << " [Follower] ";
 
 		// cout << endl;
 		// for(int i=0;i<DIMF;i++){
 		// 	cout << popLValoresF[m][i] << " ";
 		// }
 		// cout << endl;
-		path = sortIndicesByChunks(popLValoresF[m], MAX_NODES, commodities);
-		for(int j = 0; j < DIMF; j++){
-			cout << path[j] << " ";
-		}
+		// path = sortIndicesByChunks(popLValoresF[m], MAX_NODES, commodities);
+		// for(int j = 0; j < DIMF; j++){
+		// 	cout << path[j] << " ";
+		// }
 		
-		cout << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF+1] << " " << getNEval(1) << " " << getNEval(2) << endl;
+		//cout << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF+1] << " " << getNEval(1) << " " << getNEval(2) << endl;
 		
 		geraArquivoResultados(filename, g, m, uL, path);
 		
@@ -684,21 +676,23 @@ int main(int argc, char *argv[]){
 				outFile = argv[++i];
 		}
     }
-	//Aumentar GENF
+	
 	inicializaCusto(cost, tollEdges, inFile);
 	
     srand(SEED);
 
+	//Valor de GENF proporcional a quantidade de commodities
+	GENF = GENF * commodities.size();
+
     DIML = getDimensao(FUNCAO, 1, MAX_NODES, MAX_TOLL_EDGES, commodities.size());
     DIMF = getDimensao(FUNCAO, 2, MAX_NODES, MAX_TOLL_EDGES, commodities.size());	
-	//cout << "chegou aqui " << endl;
 	
     inicializa(popLValoresF, SIZEL, DIMF, 2); //Inicializa vetor do nível inferior com valores aleatórios
-	//cout << "chegou aqui 1" << endl;
+	
     inicializa(popL, SIZEL, DIML, 1); //Inicializa vetor do nível superior com valores aleatórios
-	//cout << "chegou aqui 2" << endl;
+	
     inicializa(popLNova, SIZEL, DIML, 2);
-	//cout << "chegou aqui 3" << endl;
+	
 	
     BlDE(outFile);
 	
