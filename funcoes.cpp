@@ -6,7 +6,6 @@
 
 #include "stdio.h"
 
-
 using namespace std;
 
 // Matriz de custo nas arestas
@@ -1704,12 +1703,12 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
             //  cout << endl;
 
             int *path = ordenaSolucao(ind, maxNodes, source);
-            // for(int i=0;i<maxNodes*commodities.size();i++){
-            // 	cout << path[i] << " ";
+            // for (int i = 0; i < maxNodes; i++) {
+            //     cout << path[i] << " ";
             // }
             // cout << endl;
 
-            // cout << "Source: " << source << " Target: " << target <<  endl;
+            // cout << "Source: " << source << " Target: " << target << endl;
 
             for (int i = 0; i < maxNodes; i++) {
                 if (path[i] == target) {
@@ -1743,8 +1742,8 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
             delete[] path;
         }
         // exit(1);
-        ind[d] = fit;
-        ind[d + 1] = rest;
+        ind[d] += fit;
+        ind[d + 1] += rest;
     }
 }
 

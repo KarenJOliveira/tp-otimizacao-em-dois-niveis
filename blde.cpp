@@ -43,7 +43,7 @@ double **popL;
 // Populacao para armazenar os valores da Leader após avaliação do Follower
 double **popLNova;
 // Populacao para armazenar os valores da Follower correspondentes ao Leader em popL
-double **popLValoresF;
+double ***popLValoresF;
 
 void inicializaFollower(double **&pop, double *leader, int n, int d);
 void inicializa(double **&pop, int n, int d, int nivel = 2);
@@ -389,7 +389,7 @@ void deLeader() {
         selecionaIndividuos(ind1, ind2, ind3, i, SIZEL);
 
         double *u = new double[DIML + 2];
-
+        u[DIML + 1] = 0;
         int jRand = rand() % DIML;
 
         for (int j = 0; j < DIML; j++) {
@@ -400,7 +400,7 @@ void deLeader() {
                 } else if (VARIANTE == 2) {
                     //--------- DE/best/1/bin
                     u[j] = uBest[j] + F * (popL[ind2][j] - popL[ind3][j]);
-                } else if (VARIANTE = 3) {
+                } else if (VARIANTE == 3) {
                     //--------- DE/target-to-rand/1/bin
                     u[j] = popL[i][j] + F * (popL[ind1][j] - popL[i][j]) + F * (popL[ind2][j] - popL[ind3][j]);
                 }
@@ -418,20 +418,25 @@ void deLeader() {
 
         int qntCommodities = commodities.size();
         double **uF = new double *[qntCommodities];  // uF = melhor da populacao do seguidor
+
+        int restU = u[DIML + 1];
         int index = 0;
         for (auto it = commodities.begin(); it != commodities.end(); it++) {
             get<0>(commodity) = it->first.first;
             get<1>(commodity) = it->first.second;
             get<2>(commodity) = it->second;
+            int source = it->first.first;
+            int target = it->first.second;
 
             uF[index] = new double[DIMF + 2];
+            restU = u[DIML + 1];
             deFollower(u, uF[index]);  // retorna o melhor indivíduo do nível inferior
-
+            restU = u[DIML + 1];
             // uF é usado para avaliar o indivíduo do nível superior
-            if ((iguais(u, popL[i], DIML) == 1) && (iguais(uF[index], popLValoresF[i], DIMF) == 0)) {
-                if (compara(uF[index], popLValoresF[i], DIMF, 2) > 0) {
+            if ((iguais(u, popL[i], DIML) == 1) && (iguais(uF[index], popLValoresF[index][i], DIMF) == 0)) {
+                if (compara(uF[index], popLValoresF[index][i], DIMF, 2) > 0) {
                     for (int j = 0; j < DIMF + 2; j++) {
-                        popLValoresF[i][j] = uF[index][j];
+                        popLValoresF[index][i][j] = uF[index][j];
                     }
                     calculaAptidao(popL[i], DIML, 1, popL[i], uF[index]);
                     if (uF[index][DIMF + 1] > 0) {
@@ -439,30 +444,39 @@ void deLeader() {
                     }
                 } else {
                     for (int j = 0; j < DIMF + 2; j++) {
-                        uF[index][j] = popLValoresF[i][j];
+                        uF[index][j] = popLValoresF[index][i][j];
                     }
                 }
             }
-            calculaAptidao(u, DIML, 1, u, uF[index]);
 
+            calculaAptidao(u, DIML, 1, u, uF[index]);
+            restU = u[DIML + 1];
+            bool violou = (uF[index][DIMF + 1] > 0) ? true : false;
             if (uF[index][DIMF + 1] > 0) {
                 u[DIML + 1] = u[DIML + 1] + PENALTY * uF[index][DIMF + 1];
             }
-
-            if (compara(u, popL[i], DIML, 1) > 0) {
-                for (int j = 0; j < DIML + 2; j++) {
-                    popLNova[i][j] = u[j];
-                }
-                for (int j = 0; j < DIMF + 2; j++) {
-                    popLValoresF[i][j] = uF[index][j];
-                }
-            } else {
-                for (int j = 0; j < DIML + 2; j++) {
-                    popLNova[i][j] = popL[i][j];
-                }
-            }
+            restU = u[DIML + 1];
             index++;
         }
+
+        restU = u[DIML + 1];
+        int restL = popL[i][DIML + 1];
+        if (compara(u, popL[i], DIML, 1) > 0) {
+            for (int j = 0; j < DIML + 2; j++) {
+                popLNova[i][j] = u[j];
+            }
+            for (int index = 0; index < qntCommodities; index++) {
+                for (int j = 0; j < DIMF + 2; j++) {
+                    popLValoresF[index][i][j] = uF[index][j];
+                }
+            }
+        } else {
+            for (int j = 0; j < DIML + 2; j++) {
+                popLNova[i][j] = popL[i][j];
+            }
+        }
+
+        restL = popL[i][DIML + 1];
 
         for (int i = 0; i < qntCommodities; i++) {
             delete[] uF[i];
@@ -507,7 +521,27 @@ void geraArquivoResultados(string &filename, int g, int m, double *uL, int *path
 
     outFile << uL[DIML] << "," << uL[DIML + 1] << ",";
 
-    outFile << popLValoresF[m][DIMF] << "," << popLValoresF[m][DIMF + 1] << endl;
+    for (int i = 0; i < commodities.size(); i++) {
+        outFile << popLValoresF[i][m][DIMF] << "," << popLValoresF[i][m][DIMF + 1] << ",";
+    }
+    outFile << endl;
+
+    outFile.close();
+}
+
+void geraArquivoCaminhos(string &filename, int source, int target, int *path) {
+    ofstream outFile;
+    outFile.open(filename.c_str(), ios::app);
+
+    if (!outFile.is_open()) {
+        cerr << "Erro ao abrir o arquivo de saída" << endl;
+        return;
+    }
+    outFile << "Source: " << source << ",Target: " << target << ", Path: ";
+    for (int i = 0; i < DIMF; i++) {
+        outFile << path[i] << ",";
+    }
+    outFile << endl;
 
     outFile.close();
 }
@@ -526,6 +560,7 @@ void inicializaFollower(double **&pop, double *leader, int n, int d) {
 }
 
 // pop
+// index: indice da commodity que está sendo analisada
 // n: tamanho da população
 // d: quantidade de variáveis
 // nivel: 1 para líder e 2 para seguidor
@@ -540,13 +575,20 @@ void inicializa(double **&pop, int n, int d, int nivel) {
         }
 
         if (nivel == 1) {  // se lider, determina valores do seguidor
+            int index = 0;
+            for (auto it = commodities.begin(); it != commodities.end(); it++) {
+                get<0>(commodity) = it->first.first;
+                get<1>(commodity) = it->first.second;
+                get<2>(commodity) = it->second;
 
-            deFollower(pop[i], popLValoresF[i]);
-            // cout << "!!!" << endl;
-            calculaAptidao(pop[i], DIML, 1, pop[i], popLValoresF[i]);
-            // cout << "!!!1" << endl;
-            if (popLValoresF[i][DIMF + 1] > 0) {
-                pop[i][DIML + 1] = pop[i][DIML + 1] + PENALTY * popLValoresF[i][DIMF + 1];
+                deFollower(pop[i], popLValoresF[index][i]);
+                // cout << "!!!" << endl;
+                calculaAptidao(pop[i], DIML, 1, pop[i], popLValoresF[index][i]);
+                // cout << "!!!1" << endl;
+                if (popLValoresF[index][i][DIMF + 1] > 0) {
+                    pop[i][DIML + 1] = pop[i][DIML + 1] + PENALTY * popLValoresF[index][i][DIMF + 1];
+                }
+                index++;
             }
 
         } else {
@@ -570,28 +612,58 @@ void BlDE(string &filename) {
 
         double *uL = new double[DIML + 2];
         int m = selecionaMelhor(uL, popL, SIZEL, DIML, 2);
-        /*
-        cout << "G-" << g << " [Leader] ";
-        for(int j = 0; j < DIML; j++){
-            cout << uL[j] << " ";
-        }
-        cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML+1] << " [Follower] ";
 
-        cout << endl;
-        for(int i=0;i<DIMF;i++){
-            cout << popLValoresF[m][i] << " ";
-        }
-        cout << endl;
+        // cout << "G-" << g << " [Leader] ";
+        // for (int j = 0; j < DIML; j++) {
+        //     cout << uL[j] << " ";
+        // }
+        // cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
 
-        startNode = commodities[]
-        path = ordenaSolucao(popLValoresF[m], MAX_NODES, startNode);
-        for(int j = 0; j < DIMF; j++){
-            cout << path[j] << " ";
-        }
+        // cout << endl;
+        // for (int i = 0; i < DIMF; i++) {
+        //     cout << popLValoresF[m][i] << " ";
+        // }
+        // cout << endl;
 
-        cout << "Fit: " << popLValoresF[m][DIMF] << " Const: " << popLValoresF[m][DIMF+1] << " " << getNEval(1) << " " << getNEval(2) << endl;
-        */
-        geraArquivoResultados(filename, g, m, uL, path);
+        // int index = 0;
+        // for (auto it = commodities.begin(); it != commodities.end(); it++) {
+        //     cout << popLValoresF[index][m][DIMF] << "," << popLValoresF[index][m][DIMF + 1] << ",";
+        //     int startNode = it->first.first;
+        //     path = ordenaSolucao(popLValoresF[index][m], MAX_NODES, startNode);
+        //     for (int j = 0; j < DIMF; j++) {
+        //         cout << path[j] << " ";
+        //     }
+        //     cout << endl;
+        //     cout << "Fit: " << popLValoresF[index][m][DIMF] << " Const: " << popLValoresF[index][m][DIMF + 1] << " " << getNEval(1) << " " << getNEval(2) << endl;
+        //     index++;
+        // }
+
+        if (g == GENL - 1) {
+            geraArquivoResultados(filename, g, m, uL, path);
+
+            cout << "G-" << g << " [Leader] ";
+            for (int j = 0; j < DIML; j++) {
+                cout << uL[j] << " ";
+            }
+            cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
+
+            int index = 0;
+            for (auto it = commodities.begin(); it != commodities.end(); it++) {
+                int source = it->first.first;
+                int target = it->first.second;
+
+                cout << popLValoresF[index][m][DIMF] << "," << popLValoresF[index][m][DIMF + 1] << ",";
+                int startNode = it->first.first;
+                path = ordenaSolucao(popLValoresF[index][m], MAX_NODES, startNode);
+                for (int j = 0; j < DIMF; j++) {
+                    cout << path[j] << " ";
+                }
+                cout << endl;
+                cout << "Fit: " << popLValoresF[index][m][DIMF] << " Const: " << popLValoresF[index][m][DIMF + 1] << " " << getNEval(1) << " " << getNEval(2) << endl;
+                geraArquivoCaminhos(filename, source, target, path);
+                index++;
+            }
+        }
 
         delete[] uL;
 
@@ -651,19 +723,23 @@ int main(int argc, char *argv[]) {
             outFile = argv[++i];
         }*/
     }
-    inFile = "instances/instance_10_5_20.txt";
-    outFile = "result.csv";
+    inFile = "instances/instance_15_5_30.txt";
+    outFile = "result6.csv";
     inicializaCusto(cost, tollEdges, inFile);
 
     srand(SEED);
 
-    // Valor de GENF proporcional a quantidade de commodities
-    GENF = GENF * commodities.size();
+    GENF = GENF * commodities.size();  // quantidade de gerações para o seguidor
 
     DIML = getDimensao(FUNCAO, 1, MAX_NODES, MAX_TOLL_EDGES, commodities.size());
     DIMF = getDimensao(FUNCAO, 2, MAX_NODES, MAX_TOLL_EDGES, commodities.size());
 
-    inicializa(popLValoresF, SIZEL, DIMF, 2);  // Inicializa vetor do nível inferior com valores aleatórios
+    popLValoresF = new double **[commodities.size()];
+    int index = 0;
+    for (auto it = commodities.begin(); it != commodities.end(); it++) {
+        inicializa(popLValoresF[index], SIZEL, DIMF, 2);  // Inicializa vetor do nível inferior com valores aleatórios
+        index++;
+    }
 
     inicializa(popL, SIZEL, DIML, 1);  // Inicializa vetor do nível superior com valores aleatórios
 
