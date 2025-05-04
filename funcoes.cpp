@@ -527,7 +527,7 @@ int *ordenaSolucao(double *solucao, int maxNodes, int startNode) {
     return solucaoIndices;
 }
 
-void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follower, int funcao, double **cost, vector<int> tollEdges, int maxNodes, tuple<int, int, double> commodity) {
+void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follower, int funcao, double &fitness, double &restriction, double **cost, vector<int> tollEdges, int maxNodes, tuple<int, int, double> commodity) {
     // Incrementa o numero de chamadas à função
     if (nivel == 1) {
         nEvalL++;
@@ -1742,8 +1742,10 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
             delete[] path;
         }
         // exit(1);
-        ind[d] += fit;
-        ind[d + 1] += rest;
+        // ind[d] = fit;
+        // ind[d + 1] = rest;
+        fitness = fit;
+        restriction = rest;
     }
 }
 
