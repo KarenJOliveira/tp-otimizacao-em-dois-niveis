@@ -392,6 +392,7 @@ void deLeader() {
         selecionaIndividuos(ind1, ind2, ind3, i, SIZEL);
 
         double *u = new double[DIML + 2];
+        u[DIML] = 0;
         u[DIML + 1] = 0;
         int jRand = rand() % DIML;
 
@@ -421,7 +422,11 @@ void deLeader() {
 
         int qntCommodities = commodities.size();
         double **uF = new double *[qntCommodities];  // uF = melhor da populacao do seguidor
-        double fit, rest;
+        double fit = 0;
+        double rest = 0;
+
+        // cout << "Fit pop: " << popL[i][DIML] << endl;
+        // cout << "Rest pop: " << popL[i][DIML + 1] << endl;
 
         int index = 0;
         for (auto it = commodities.begin(); it != commodities.end(); it++) {
@@ -435,26 +440,27 @@ void deLeader() {
 
             deFollower(u, uF[index]);  // retorna o melhor indivíduo do nível inferior
 
+            /*
             // uF é usado para avaliar o indivíduo do nível superior
             if ((iguais(u, popL[i], DIML) == 1) && (iguais(uF[index], popLValoresF[index][i], DIMF) == 0)) {
                 if (compara(uF[index], popLValoresF[index][i], DIMF, 2) > 0) {
                     for (int j = 0; j < DIMF + 2; j++) {
                         popLValoresF[index][i][j] = uF[index][j];
                     }
-
-                    calculaAptidao(popL[i], DIML, 1, popL[i], uF[index], fit, rest);
-                    popL[i][DIML] += fit;
-                    popL[i][DIML + 1] += rest;
-
-                    if (uF[index][DIMF + 1] > 0) {
-                        popL[i][DIML + 1] = popL[i][DIML + 1] + PENALTY * uF[index][DIMF + 1];
-                    }
                 } else {
                     for (int j = 0; j < DIMF + 2; j++) {
                         uF[index][j] = popLValoresF[index][i][j];
                     }
                 }
+
+                calculaAptidao(popL[i], DIML, 1, popL[i], uF[index], fit, rest);
+                popL[i][DIML] += fit;
+                popL[i][DIML + 1] += rest;
+                if (uF[index][DIMF + 1] > 0) {
+                    popL[i][DIML + 1] = popL[i][DIML + 1] + PENALTY * uF[index][DIMF + 1];
+                }
             }
+            */
 
             calculaAptidao(u, DIML, 1, u, uF[index], fit, rest);
             u[DIML] += fit;
@@ -533,7 +539,7 @@ void geraArquivoResultados(string &filename, int g, int m, double *uL, int *path
     outFile.close();
 }
 
-void geraArquivoCaminhos(string &filename, int source, int target, int *path) {
+void geraArquivoCaminhos(string &filename, int source, int target, int *path, double *uL) {
     ofstream outFile;
     outFile.open(filename.c_str(), ios::app);
 
@@ -541,6 +547,15 @@ void geraArquivoCaminhos(string &filename, int source, int target, int *path) {
         cerr << "Erro ao abrir o arquivo de saída" << endl;
         return;
     }
+
+    /*
+    outFile << "Tarifas: " << endl;
+    for (int j = 0; j < DIML; j++) {
+        outFile << uL[j] << " ";
+    }
+    outFile << endl;
+    */
+
     outFile << "Source: " << source << ",Target: " << target << ", Path: ";
     for (int i = 0; i < DIMF; i++) {
         outFile << path[i] << ",";
@@ -585,7 +600,12 @@ void inicializa(double **&pop, int n, int d, int nivel) {
         if (nivel == 1) {  // se lider, determina valores do seguidor
             fit = 0.0;
             rest = 0.0;
+            pop[i][DIML] = 0;
+            pop[i][DIML + 1] = 0;
             int index = 0;
+            // cout << "Fit pop: " << pop[i][DIML] << endl;
+            // cout << "Rest pop: " << pop[i][DIML + 1] << endl;
+
             for (auto it = commodities.begin(); it != commodities.end(); it++) {
                 get<0>(commodity) = it->first.first;
                 get<1>(commodity) = it->first.second;
@@ -602,6 +622,9 @@ void inicializa(double **&pop, int n, int d, int nivel) {
                 }
                 index++;
             }
+
+            // cout << "Fit pop: " << pop[i][DIML] << endl;
+            // cout << "Rest pop: " << pop[i][DIML + 1] << endl;
 
         } else {
             calculaAptidao(pop[i], d, 0, NULL, NULL, fit, rest);
@@ -625,11 +648,13 @@ void BlDE(string &filename) {
         double *uL = new double[DIML + 2];
         int m = selecionaMelhor(uL, popL, SIZEL, DIML, 2);
 
-        // cout << "G-" << g << " [Leader] ";
-        // for (int j = 0; j < DIML; j++) {
-        //     cout << uL[j] << " ";
-        // }
-        // cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
+        /*
+        cout << "G-" << g << " [Leader] ";
+        for (int j = 0; j < DIML; j++) {
+            cout << uL[j] << " ";
+        }
+        cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
+        */
 
         // cout << endl;
         // for (int i = 0; i < DIMF; i++) {
@@ -660,24 +685,26 @@ void BlDE(string &filename) {
             cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
             */
 
+            /*
             int index = 0;
             for (auto it = commodities.begin(); it != commodities.end(); it++) {
                 int source = it->first.first;
                 int target = it->first.second;
 
-                cout << popLValoresF[index][m][DIMF] << "," << popLValoresF[index][m][DIMF + 1] << ",";
+                // cout << popLValoresF[index][m][DIMF] << "," << popLValoresF[index][m][DIMF + 1] << ",";
                 int startNode = it->first.first;
                 path = ordenaSolucao(popLValoresF[index][m], MAX_NODES, startNode);
-                /*
+
                 for (int j = 0; j < DIMF; j++) {
                     cout << path[j] << " ";
                 }
                 cout << endl;
                 cout << "Fit: " << popLValoresF[index][m][DIMF] << " Const: " << popLValoresF[index][m][DIMF + 1] << " " << getNEval(1) << " " << getNEval(2) << endl;
-                */
-                geraArquivoCaminhos(filename, source, target, path);
+
+                geraArquivoCaminhos(filename, source, target, path, uL);
                 index++;
             }
+            */
         }
 
         delete[] uL;
@@ -738,7 +765,7 @@ int main(int argc, char *argv[]) {
             outFile = argv[++i];
         }
     }
-    // inFile = "instances/instance_15_5_30.txt";
+    // inFile = "instances/instance_10_8_30.txt";
     // outFile = "result6.csv";
     inicializaCusto(cost, tollEdges, inFile);
 
