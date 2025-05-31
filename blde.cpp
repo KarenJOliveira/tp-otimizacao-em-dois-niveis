@@ -519,7 +519,7 @@ void imprimeCabecalho() {
     cout << "fitFollower fitFollowerValue constFollower constFollowerValue" << " nEvalL nEvalF" << endl;
 }
 
-void geraArquivoResultados(string &filename, int g, int m, double *uL, int *path) {
+void geraArquivoResultados(string &filename, int g, int m, double *uL, vector<int> path) {
     ofstream outFile;
     outFile.open(filename.c_str(), ios::app);
 
@@ -539,7 +539,7 @@ void geraArquivoResultados(string &filename, int g, int m, double *uL, int *path
     outFile.close();
 }
 
-void geraArquivoCaminhos(string &filename, int source, int target, int *path, double *uL) {
+void geraArquivoCaminhos(string &filename, int source, int target, vector<int> path, double *uL) {
     ofstream outFile;
     outFile.open(filename.c_str(), ios::app);
 
@@ -559,6 +559,9 @@ void geraArquivoCaminhos(string &filename, int source, int target, int *path, do
     outFile << "Source: " << source << ",Target: " << target << ", Path: ";
     for (int i = 0; i < DIMF; i++) {
         outFile << path[i] << ",";
+        if (path[i] == target) {
+            break;
+        }
     }
     outFile << endl;
 
@@ -641,7 +644,7 @@ void BlDE(string &filename) {
 
     calculaVariancia(popL, var_inicial, DIML, SIZEL);
 
-    int *path;
+    vector<int> path;
     for (int g = 0; g < GENL; g++) {
         deLeader();
 
@@ -677,15 +680,13 @@ void BlDE(string &filename) {
 
         if (g == GENL - 1) {
             geraArquivoResultados(filename, g, m, uL, path);
-            /*
-            cout << "G-" << g << " [Leader] ";
-            for (int j = 0; j < DIML; j++) {
-                cout << uL[j] << " ";
-            }
-            cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
-            */
 
-            /*
+            // cout << "G-" << g << " [Leader] ";
+            // for (int j = 0; j < DIML; j++) {
+            //     cout << uL[j] << " ";
+            // }
+            // cout << "Fit: " << uL[DIML] << " Const: " << uL[DIML + 1] << " [Follower] ";
+
             int index = 0;
             for (auto it = commodities.begin(); it != commodities.end(); it++) {
                 int source = it->first.first;
@@ -695,16 +696,15 @@ void BlDE(string &filename) {
                 int startNode = it->first.first;
                 path = ordenaSolucao(popLValoresF[index][m], MAX_NODES, startNode);
 
-                for (int j = 0; j < DIMF; j++) {
-                    cout << path[j] << " ";
-                }
-                cout << endl;
-                cout << "Fit: " << popLValoresF[index][m][DIMF] << " Const: " << popLValoresF[index][m][DIMF + 1] << " " << getNEval(1) << " " << getNEval(2) << endl;
+                // for (int j = 0; j < DIMF; j++) {
+                //     cout << path[j] << " ";
+                // }
+                // cout << endl;
+                // cout << "Fit: " << popLValoresF[index][m][DIMF] << " Const: " << popLValoresF[index][m][DIMF + 1] << " " << getNEval(1) << " " << getNEval(2) << endl;
 
                 geraArquivoCaminhos(filename, source, target, path, uL);
                 index++;
             }
-            */
         }
 
         delete[] uL;
@@ -759,14 +759,14 @@ int main(int argc, char *argv[]) {
             CR = atof(argv[++i]);
         } else if (strcmp(argv[i], "-Var") == 0) {
             VARIANTE = atoi(argv[++i]);
-        } else if (strcmp(argv[i], "-inFile") == 0) {
+        } /*else if (strcmp(argv[i], "-inFile") == 0) {
             inFile = argv[++i];
         } else if (strcmp(argv[i], "-outFile") == 0) {
             outFile = argv[++i];
-        }
+        }*/
     }
-    // inFile = "instances/instance_10_8_30.txt";
-    // outFile = "result6.csv";
+    inFile = "instances/instance_20_1_5.txt";
+    outFile = "result6.csv";
     inicializaCusto(cost, tollEdges, inFile);
 
     srand(SEED);

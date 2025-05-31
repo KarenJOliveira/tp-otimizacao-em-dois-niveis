@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <limits>
+#include <set>
+#include <vector>
 
 #include "stdio.h"
 
@@ -220,7 +223,7 @@ int getDimensao(int funcao, int nivel, int maxNodes, int maxTollEdges, int maxCo
             if (nivel == 1) {
                 return maxTollEdges;
             } else if (nivel == 2) {
-                return maxNodes;
+                return 100;
             }
     }
 }
@@ -474,14 +477,14 @@ void printDOT(ofstream &file, double **&cost, int maxNodes, int *path, vector<in
 
 */
 
-int *ordenaSolucao(double *solucao, int maxNodes, int startNode) {
+vector<int> ordenaSolucao(double *solucao, int maxNodes, int startNode) {
     int numNodes = maxNodes;
-    int *solucaoIndices = new int[numNodes];
-    double *temp = new double[numNodes];
+    vector<int> solucaoIndices;
+    vector<double> temp;
 
     for (int i = 0; i < numNodes; i++) {
-        temp[i] = solucao[i];
-        solucaoIndices[i] = i;
+        temp.push_back(solucao[i]);
+        solucaoIndices.push_back(i);
     }
 
     // for(int i=0;i<numNodes;i++){
@@ -522,9 +525,18 @@ int *ordenaSolucao(double *solucao, int maxNodes, int startNode) {
     // for(int i=0;i<numNodes;i++){
     // 	cout << solucaoIndices[i] << " ";
     // }
-
-    delete[] temp;
     return solucaoIndices;
+}
+
+vector<int> retornaAdjacentes(int noAtual, double **cost, int maxNodes, set<int> visitados) {
+    vector<int> adjacentes;
+    for (int i = 0; i < maxNodes; i++) {
+        auto it = visitados.find(i);
+        if (cost[noAtual][i] != 0 && cost[noAtual][i] != INFINITY && it == visitados.end()) {
+            adjacentes.push_back(i);
+        }
+    }
+    return adjacentes;
 }
 
 void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follower, int funcao, double &fitness, double &restriction, double **cost, vector<int> tollEdges, int maxNodes, tuple<int, int, double> commodity) {
@@ -1662,15 +1674,46 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
             // 	cout << path[i] << " ";
             // }
             // cout << endl;
+            vector<int> path;
+            vector<int> list = ordenaSolucao(follower, maxNodes, source);
+            int noAtual = list[0];
+            path.push_back(noAtual);
+            vector<int> adjacentes;
+            set<int> visitados;
 
-            int *path = ordenaSolucao(follower, maxNodes, source);
+            int i = 1;
+
+            while (noAtual != target) {
+                visitados.insert(noAtual);
+                adjacentes = retornaAdjacentes(noAtual, cost, maxNodes, visitados);
+                int proxNo;
+                if (adjacentes.size() == 0) {
+                    auto it = find(path.begin(), path.end(), noAtual);
+                    if (it != path.begin()) {
+                        proxNo = *prev(it);
+                        rest = rest + 1;  // No caminho não há adjacentes, então é necessário voltar
+                    }
+                } else {
+                    int proxIndex = list[i] % adjacentes.size();
+                    proxNo = adjacentes[proxIndex];
+                }
+
+                path.push_back(proxNo);
+                noAtual = proxNo;
+                adjacentes.clear();
+                i++;
+            }
+
+            path.push_back(target);
+
+            for (int i = 0; i < path.size(); i++) {
+                cout << path[i] << " ";
+            }
+            // exit(1);
 
             // cout << "Source: " << source << " Target: " << target <<  endl;
 
-            for (int i = 0; i < maxNodes; i++) {
-                if (path[i] == target) {
-                    break;
-                }
+            for (int i = 0; i < path.size(); i++) {
                 int u = path[i];
                 int v = path[i + 1];
                 // cout << "u: " << u << " v: " << v << endl;
@@ -1693,27 +1736,46 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
                 }
             }
 
-            delete[] path;
-
         } else if (nivel == 2) {
-            // cout << "Follower" << endl;
-            //  for(int i=0;i<maxNodes*commodities.size();i++){
-            //  	cout << ind[i] << " ";
-            //  }
-            //  cout << endl;
+            vector<int> path;
+            vector<int> list = ordenaSolucao(ind, maxNodes, source);
+            int noAtual = list[0];
 
-            int *path = ordenaSolucao(ind, maxNodes, source);
-            // for (int i = 0; i < maxNodes; i++) {
-            //     cout << path[i] << " ";
-            // }
-            // cout << endl;
+            path.push_back(noAtual);
+            vector<int> adjacentes;
 
-            // cout << "Source: " << source << " Target: " << target << endl;
+            set<int> visitados;
 
-            for (int i = 0; i < maxNodes; i++) {
-                if (path[i] == target) {
-                    break;
+            int i = 1;
+
+            while (noAtual != target) {
+                visitados.insert(noAtual);
+                adjacentes = retornaAdjacentes(noAtual, cost, maxNodes, visitados);
+                int proxNo;
+
+                if (adjacentes.size() == 0) {
+                    auto it = find(path.begin(), path.end(), noAtual);
+                    if (it != path.begin()) {
+                        proxNo = *prev(it);
+                        rest = rest + 1;  // No caminho não há adjacentes, então é necessário voltar
+                    }
+                } else {
+                    int proxIndex = list[i] % adjacentes.size();
+                    proxNo = adjacentes[proxIndex];
                 }
+
+                path.push_back(proxNo);
+                noAtual = proxNo;
+                adjacentes.clear();
+                i++;
+            }
+
+            for (int i = 0; i < path.size(); i++) {
+                cout << path[i] << " ";
+            }
+            // exit(1);
+
+            for (int i = 0; i < path.size(); i++) {
                 int u = path[i];
                 int v = path[i + 1];
                 // cout << "u: " << u << " v: " << v << endl;
@@ -1738,8 +1800,6 @@ void calculaFuncao(double *ind, int d, int nivel, double *leader, double *follow
                     }
                 }
             }
-
-            delete[] path;
         }
         // exit(1);
         // ind[d] = fit;

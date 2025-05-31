@@ -5,6 +5,7 @@
 #include <cfloat>
 #include <fstream>
 #include <map>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -20,6 +21,7 @@ double getUpper(int nivel, int funcao, int indice);
 
 int getNEval(int nivel);
 
-int *ordenaSolucao(double *solucao, int maxNodes, int startNode);
+std::vector<int> ordenaSolucao(double *solucao, int maxNodes, int startNode);
+std::vector<int> retornaAdjacentes(int noAtual, double **cost, int maxNodes, std::set<int> visitados);
 // void printDOT(std::ofstream &file, double **&cost, int maxNodes, int *path, std::vector<int> tollEdges, int endNode);
 // int* copyUntilElement(int* path, int length, int element, int& newLength);
